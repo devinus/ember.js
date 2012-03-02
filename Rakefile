@@ -6,6 +6,17 @@ require "net/github-upload"
 require "bundler/setup"
 require "erb"
 require "uglifier"
+require "ember_docs/cli"
+
+desc "Strip trailing whitespace for JavaScript files in packages"
+task :strip_whitespace do
+  Dir["packages/**/*.js"].each do |name|
+    body = File.read(name)
+    File.open(name, "w") do |file|
+      file.write body.gsub(/ +\n/, "\n")
+    end
+  end
+end
 
 # for now, the SproutCore compiler will be used to compile Ember.js
 require "sproutcore"
@@ -335,6 +346,7 @@ namespace :release do
 
     task :index => "tmp/starter-kit/index.html"
 
+    desc "Update starter-kit repo"
     task :update => :index do
       puts "Updating starter-kit repo"
       unless pretend?
@@ -358,15 +370,37 @@ namespace :release do
     desc "Build the Ember.js starter kit"
     task :build => "dist/starter-kit.#{EMBER_VERSION}.zip"
 
+    desc "Prepare starter-kit for release"
     task :prepare => [:build]
 
+    desc "Release starter-kit"
     task :deploy => [:update]
   end
 
+  desc "Prepare Ember for new release"
   task :prepare => ['framework:prepare', 'starter_kit:prepare']
 
+  desc "Deploy a new Ember release"
   task :deploy => ['framework:deploy', 'starter_kit:deploy']
 
+end
+
+namespace :docs do
+  def doc_args
+    "#{Dir.glob("packages/ember-*").join(' ')} -E #{Dir.glob("packages/ember-*/tests").join(' ')} -t docs.emberjs.com"
+  end
+
+  task :preview do
+    EmberDocs::CLI.start("preview #{doc_args}".split(' '))
+  end
+
+  task :build do
+    EmberDocs::CLI.start("generate #{doc_args} -o docs".split(' '))
+  end
+
+  task :clean do
+    rm_r "docs"
+  end
 end
 
 task :default => :dist

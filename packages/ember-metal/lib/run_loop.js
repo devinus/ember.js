@@ -10,15 +10,18 @@ require('ember-metal/core'); // Ember.Logger
 require('ember-metal/watching'); // Ember.watch.flushPending
 require('ember-metal/observer'); // Ember.beginPropertyChanges, Ember.endPropertyChanges
 require('ember-metal/utils'); // Ember.guidFor
+require('ember-metal/array'); // Ember.ArrayUtils
 
 // ..........................................................
 // HELPERS
 //
 
 var slice = Array.prototype.slice;
+var forEach = Ember.ArrayUtils.forEach;
 
 // invokes passed params - normalizing so you can pass target/func,
 // target/string or just func
+/** @private */
 function invoke(target, method, args, ignore) {
 
   if (method===undefined) {
@@ -53,7 +56,10 @@ function invoke(target, method, args, ignore) {
 
 var timerMark; // used by timers...
 
+/** @private */
 var K = function() {};
+
+/** @private */
 var RunLoop = function(prev) {
   var self;
 
@@ -116,7 +122,7 @@ RunLoop.prototype = {
         // the sync phase is to allow property changes to propogate.  don't
         // invoke observers until that is finished.
         if (queueName === 'sync') Ember.beginPropertyChanges();
-        queue.forEach(iter);
+        forEach(queue, iter);
         if (queueName === 'sync') Ember.endPropertyChanges();
 
         if (log) Ember.Logger.log('End: Flush Sync Queue');
@@ -136,7 +142,7 @@ RunLoop.prototype = {
           if (log) Ember.Logger.log('Begin: Flush Sync Queue');
 
           if (queueName === 'sync') Ember.beginPropertyChanges();
-          if (queue) queue.forEach(iter);
+          if (queue) forEach(queue, iter);
           if (queueName === 'sync') Ember.endPropertyChanges();
 
           if (log) Ember.Logger.log('End: Flush Sync Queue');
@@ -158,8 +164,6 @@ Ember.RunLoop = RunLoop;
 // ..........................................................
 // Ember.run - this is ideally the only public API the dev sees
 //
-
-var run;
 
 /**
   Runs the passed target and method inside of a runloop, ensuring any
@@ -184,7 +188,7 @@ var run;
 
   @returns {Object} return value from invoking the passed function.
 */
-Ember.run = run = function(target, method) {
+Ember.run = function(target, method) {
 
   var ret, loop;
   run.begin();
@@ -195,6 +199,10 @@ Ember.run = run = function(target, method) {
   }
   return ret;
 };
+
+/** @private */
+var run = Ember.run;
+
 
 /**
   Begins a new RunLoop.  Any deferred actions invoked after the begin will
@@ -268,6 +276,7 @@ Ember.run.schedule = function(queue, target, method) {
 
 var autorunTimer;
 
+/** @private */
 function autorun() {
   autorunTimer = null;
   if (run.currentRunLoop) run.end();
@@ -319,6 +328,7 @@ Ember.run.sync = function() {
 var timers = {}; // active timers...
 
 var laterScheduled = false;
+/** @private */
 function invokeLaterTimers() {
   var now = (+ new Date()), earliest = -1;
   for(var key in timers) {
@@ -386,6 +396,7 @@ Ember.run.later = function(target, method) {
   return guid;
 };
 
+/** @private */
 function invokeOnceTimer(guid, onceTimers) {
   if (onceTimers[this.tguid]) delete onceTimers[this.tguid][this.mguid];
   if (timers[guid]) invoke(this.target, this.method, this.args, 2);
@@ -442,6 +453,7 @@ Ember.run.once = function(target, method) {
 };
 
 var scheduledNext = false;
+/** @private */
 function invokeNextTimers() {
   scheduledNext = null;
   for(var key in timers) {

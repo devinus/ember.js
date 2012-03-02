@@ -15,13 +15,16 @@ require('ember-metal/array');
 var Mixin, MixinDelegate, REQUIRED, Alias;
 var classToString, superClassString;
 
-var a_map = Array.prototype.map;
+var a_map = Ember.ArrayUtils.map;
+var a_indexOf = Ember.ArrayUtils.indexOf;
+var a_forEach = Ember.ArrayUtils.forEach;
 var a_slice = Array.prototype.slice;
 var EMPTY_META = {}; // dummy for non-writable meta
 var META_SKIP = { __emberproto__: true, __ember_count__: true };
 
 var o_create = Ember.platform.create;
 
+/** @private */
 function meta(obj, writable) {
   var m = Ember.meta(obj, writable!==false), ret = m.mixins;
   if (writable===false) return ret || EMPTY_META;
@@ -35,9 +38,10 @@ function meta(obj, writable) {
   return ret;
 }
 
+/** @private */
 function initMixin(mixin, args) {
   if (args && args.length > 0) {
-    mixin.mixins = a_map.call(args, function(x) {
+    mixin.mixins = a_map(args, function(x) {
       if (x instanceof Mixin) return x;
 
       // Note: Manually setup a primitive mixin here.  This is the only
@@ -52,14 +56,17 @@ function initMixin(mixin, args) {
 }
 
 var NATIVES = [Boolean, Object, Number, Array, Date, String];
+/** @private */
 function isMethod(obj) {
   if ('function' !== typeof obj || obj.isMethod===false) return false;
-  return NATIVES.indexOf(obj)<0;
+  return a_indexOf(NATIVES, obj)<0;
 }
 
+/** @private */
 function mergeMixins(mixins, m, descs, values, base) {
   var len = mixins.length, idx, mixin, guid, props, value, key, ovalue, concats;
 
+  /** @private */
   function removeKeys(keyName) {
     delete descs[keyName];
     delete values[keyName];
@@ -108,7 +115,7 @@ function mergeMixins(mixins, m, descs, values, base) {
               value.__ember_observes__ = o;
               value.__ember_observesBefore__ = ob;
             }
-          } else if ((concats && concats.indexOf(key)>=0) || key === 'concatenatedProperties') {
+          } else if ((concats && a_indexOf(concats, key)>=0) || key === 'concatenatedProperties') {
             var baseValue = values[key] || base[key];
             value = baseValue ? baseValue.concat(value) : Ember.makeArray(value);
           }
@@ -125,13 +132,15 @@ function mergeMixins(mixins, m, descs, values, base) {
 
     } else if (mixin.mixins) {
       mergeMixins(mixin.mixins, m, descs, values, base);
-      if (mixin._without) mixin._without.forEach(removeKeys);
+      if (mixin._without) a_forEach(mixin._without, removeKeys);
     }
   }
 }
 
+/** @private */
 var defineProperty = Ember.defineProperty;
 
+/** @private */
 function writableReq(obj) {
   var m = Ember.meta(obj), req = m.required;
   if (!req || (req.__emberproto__ !== obj)) {
@@ -141,10 +150,12 @@ function writableReq(obj) {
   return req;
 }
 
+/** @private */
 function getObserverPaths(value) {
   return ('function' === typeof value) && value.__ember_observes__;
 }
 
+/** @private */
 function getBeforeObserverPaths(value) {
   return ('function' === typeof value) && value.__ember_observesBefore__;
 }
@@ -153,6 +164,7 @@ Ember._mixinBindings = function(obj, key, value, m) {
   return value;
 };
 
+/** @private */
 function applyMixin(obj, mixins, partial) {
   var descs = {}, values = {}, m = Ember.meta(obj), req = m.required;
   var key, willApply, didApply, value, desc;
@@ -271,10 +283,13 @@ Ember.mixin = function(obj) {
 
 /**
   @constructor
-  @name Ember.Mixin
 */
-Mixin = function() { return initMixin(this, arguments); };
+Ember.Mixin = function() { return initMixin(this, arguments); };
 
+/** @private */
+Mixin = Ember.Mixin;
+
+/** @private */
 Mixin._apply = applyMixin;
 
 Mixin.applyPartial = function(obj) {
@@ -330,6 +345,7 @@ Mixin.prototype.applyPartial = function(obj) {
   return ret;
 };
 
+/** @private */
 function _detect(curMixin, targetMixin, seen) {
   var guid = Ember.guidFor(curMixin);
 
@@ -356,6 +372,7 @@ Mixin.prototype.without = function() {
   return ret;
 };
 
+/** @private */
 function _keys(ret, mixin, seen) {
   if (seen[Ember.guidFor(mixin)]) return;
   seen[Ember.guidFor(mixin)] = true;
@@ -366,7 +383,7 @@ function _keys(ret, mixin, seen) {
       if (props.hasOwnProperty(key)) ret[key] = true;
     }
   } else if (mixin.mixins) {
-    mixin.mixins.forEach(function(x) { _keys(ret, x, seen); });
+    a_forEach(mixin.mixins, function(x) { _keys(ret, x, seen); });
   }
 }
 
@@ -384,6 +401,7 @@ Mixin.prototype.keys = function() {
 var NAME_KEY = Ember.GUID_KEY+'_name';
 var get = Ember.get;
 
+/** @private */
 function processNames(paths, root, seen) {
   var idx = paths.length;
   for(var key in root) {
@@ -403,6 +421,7 @@ function processNames(paths, root, seen) {
   paths.length = idx; // cut out last item
 }
 
+/** @private */
 function findNamespaces() {
   var Namespace = Ember.Namespace, obj;
 
@@ -412,6 +431,8 @@ function findNamespaces() {
     //  get(window.globalStorage, 'isNamespace') would try to read the storage for domain isNamespace and cause exception in Firefox.
     // globalStorage is a storage obsoleted by the WhatWG storage specification. See https://developer.mozilla.org/en/DOM/Storage#globalStorage
     if (prop === "globalStorage" && window.StorageList && window.globalStorage instanceof window.StorageList) { continue; }
+    // Don't access properties on parent window, which will throw "Access/Permission Denied" in IE/Firefox for windows on different domains
+    if (prop === "parent" || prop === "top" || prop === "frameElement" || prop === "content") { continue; }
     // Unfortunately, some versions of IE don't support window.hasOwnProperty
     if (window.hasOwnProperty && !window.hasOwnProperty(prop)) { continue; }
 
@@ -425,6 +446,7 @@ function findNamespaces() {
 
 Ember.identifyNamespaces = findNamespaces;
 
+/** @private */
 superClassString = function(mixin) {
   var superclass = mixin.superclass;
   if (superclass) {
@@ -435,6 +457,7 @@ superClassString = function(mixin) {
   }
 };
 
+/** @private */
 classToString = function() {
   var Namespace = Ember.Namespace, namespace;
 
@@ -491,6 +514,7 @@ Ember.required = function() {
   return REQUIRED;
 };
 
+/** @private */
 Alias = function(methodName) {
   this.methodName = methodName;
 };
@@ -500,16 +524,15 @@ Ember.alias = function(methodName) {
   return new Alias(methodName);
 };
 
-Ember.Mixin = Mixin;
-
-MixinDelegate = Mixin.create({
+Ember.MixinDelegate = Mixin.create({
 
   willApplyProperty: Ember.required(),
   didApplyProperty:  Ember.required()
 
 });
 
-Ember.MixinDelegate = MixinDelegate;
+/** @private */
+MixinDelegate = Ember.MixinDelegate;
 
 
 // ..........................................................

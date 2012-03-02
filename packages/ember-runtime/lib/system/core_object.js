@@ -15,8 +15,10 @@ var rewatch = Ember.rewatch;
 var classToString = Ember.Mixin.prototype.toString;
 var set = Ember.set, get = Ember.get;
 var o_create = Ember.platform.create,
+    o_defineProperty = Ember.platform.defineProperty,
     meta = Ember.meta;
 
+/** @private */
 function makeCtor() {
 
   // Note: avoid accessing any properties on the object since it makes the
@@ -36,15 +38,21 @@ function makeCtor() {
       if (hasChains) {
         rewatch(this);
       } else {
-        this[Ember.GUID_KEY] = undefined;
+        Ember.GUID_DESC.value = undefined;
+        o_defineProperty(this, Ember.GUID_KEY, Ember.GUID_DESC);
       }
       if (init===false) { init = this.init; } // cache for later instantiations
+      Ember.GUID_DESC.value = undefined;
+      o_defineProperty(this, '_super', Ember.GUID_DESC);
       init.apply(this, arguments);
     }
   };
 
   Class.toString = classToString;
-  Class._prototypeMixinDidChange = function() { isPrepared = false; };
+  Class._prototypeMixinDidChange = function() {
+    ember_assert("Reopening already instantiated classes is not supported. We plan to support this in the future.", isPrepared === false);
+    isPrepared = false;
+  };
   Class._initMixins = function(args) { initMixins = args; };
 
   Ember.defineProperty(Class, 'proto', Ember.computed(function() {
@@ -213,6 +221,25 @@ var ClassMixin = Ember.Mixin.create({
 
     ember_assert("metaForProperty() could not find a computed property with key '"+key+"'.", !!desc && desc instanceof Ember.ComputedProperty);
     return desc._meta || {};
+  },
+
+  /**
+    Iterate over each computed property for the class, passing its name
+    and any associated metadata (see `metaForProperty`) to the callback.
+  */
+  eachComputedProperty: function(callback, binding) {
+    var proto = get(this, 'proto'),
+        descs = meta(proto).descs,
+        empty = {},
+        property;
+
+    for (var name in descs) {
+      property = descs[name];
+
+      if (property instanceof Ember.ComputedProperty) {
+        callback.call(binding || this, name, property._meta || empty);
+      }
+    }
   }
 
 });

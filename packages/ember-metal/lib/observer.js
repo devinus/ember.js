@@ -3,12 +3,12 @@
 // Copyright: ©2011 Strobe Inc. and contributors.
 // License:   Licensed under MIT license (see license.js)
 // ==========================================================================
-/*globals ember_assert */
 
 require('ember-metal/core');
 require('ember-metal/platform');
 require('ember-metal/utils');
 require('ember-metal/accessors');
+require('ember-metal/array');
 
 var AFTER_OBSERVERS = ':change';
 var BEFORE_OBSERVERS = ':before';
@@ -17,7 +17,9 @@ var normalizePath = Ember.normalizePath;
 
 var suspended = 0;
 var array_Slice = Array.prototype.slice;
+var array_ForEach = Ember.ArrayUtils.forEach;
 
+/** @private */
 var ObserverSet = function(iterateable) {
   this.set = {};
   if (iterateable) { this.array = []; }
@@ -46,17 +48,18 @@ ObserverSet.prototype.empty = function() {
 ObserverSet.prototype.forEach = function(fn) {
   var q = this.array;
   this.empty();
-  q.forEach(function(item) {
+  array_ForEach(q, function(item) {
     fn(item[0], item[1]);
   });
 };
 
 var queue = new ObserverSet(true), beforeObserverSet = new ObserverSet();
 
+/** @private */
 function notifyObservers(obj, eventName, forceNotification) {
   if (suspended && !forceNotification) {
 
-    // if suspended add to the queue to send event later - but only send 
+    // if suspended add to the queue to send event later - but only send
     // event once.
     if (!queue.contains(obj, eventName)) {
       queue.add(obj, eventName);
@@ -67,6 +70,7 @@ function notifyObservers(obj, eventName, forceNotification) {
   }
 }
 
+/** @private */
 function flushObserverQueue() {
   beforeObserverSet.empty();
 
@@ -102,22 +106,27 @@ Ember.changeProperties = function(cb){
   }
 };
 
+/** @private */
 function changeEvent(keyName) {
   return keyName+AFTER_OBSERVERS;
 }
 
+/** @private */
 function beforeEvent(keyName) {
   return keyName+BEFORE_OBSERVERS;
 }
 
+/** @private */
 function changeKey(eventName) {
   return eventName.slice(0, -7);
 }
 
+/** @private */
 function beforeKey(eventName) {
   return eventName.slice(0, -7);
 }
 
+/** @private */
 function xformForArgs(args) {
   return function (target, method, params) {
     var obj = params[0], keyName = changeKey(params[1]), val;
@@ -132,6 +141,7 @@ function xformForArgs(args) {
 
 var xformChange = xformForArgs([]);
 
+/** @private */
 function xformBefore(target, method, params) {
   var obj = params[0], keyName = beforeKey(params[1]), val;
   if (method.length>2) val = Ember.getPath(obj, keyName);

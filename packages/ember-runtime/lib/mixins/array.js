@@ -8,7 +8,7 @@
 require('ember-runtime/mixins/enumerable');
 
 
-  
+
 // ..........................................................
 // HELPERS
 // 
@@ -113,6 +113,11 @@ Ember.Array = Ember.Mixin.create(Ember.Enumerable, /** @scope Ember.Array.protot
     Returns a new array that is a slice of the receiver.  This implementation
     uses the observable array methods to retrieve the objects for the new
     slice.
+
+        var arr = ['red', 'green', 'blue'];
+        arr.slice(0);      => ['red', 'green', 'blue']
+        arr.slice(0, 2);   => ['red', 'green']
+        arr.slice(1, 100); => ['green', 'blue']
 
     @param beginIndex {Integer} (Optional) index to begin slicing from.
     @param endIndex {Integer} (Optional) index to end the slice at.
@@ -351,9 +356,9 @@ Ember.Array = Ember.Mixin.create(Ember.Enumerable, /** @scope Ember.Array.protot
     if (!this.__each) this.__each = new Ember.EachProxy(this);
     return this.__each;
   }).property().cacheable()
-  
-  
-  
+
+
+
 }) ;
 
 
